@@ -2,8 +2,10 @@ package server;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 
 public class ClientHandler {
     private Server server;
@@ -11,9 +13,12 @@ public class ClientHandler {
     private DataInputStream in;
     private DataOutputStream out;
     private String nickname;
+    private String login;
+
 
     public ClientHandler(Server server, Socket socket) {
         try {
+
             this.server = server;
             this.socket = socket;
             in = new DataInputStream(socket.getInputStream());
@@ -21,44 +26,72 @@ public class ClientHandler {
 
             new Thread(() -> {
                 try {
-                    // цикл аутентификации
-                    while (true) {
-                        String str = in.readUTF();
+                    //
+                    try{
+                        socket.setSoTimeout(120000);
+                        // цикл аутентификации
+                        while (true) {
+                            String str = in.readUTF();
 
-                        if (str.startsWith("/")) {
-                            if (str.startsWith("/auth ")) {
-                                String[] token = str.split("\\s");
-                                String newNick = server.getAuthService().getNicknameByLoginAndPassword(token[1], token[2]);
-                                if (newNick != null) {
-                                    nickname = newNick;
-                                    server.subscribe(this);
-                                    out.writeUTF("/authOk " + nickname);
-                                    break;
-                                } else {
-                                    out.writeUTF("Неверный логин/пароль");
+                            if (str.startsWith("/")) {
+                                if(str.startsWith("/reg ")){
+                                    String[] token = str.split("\\s",4);
+                                    boolean b = server.getAuthService().registration(token[1], token[2], token[3]);
+                                    if(b){
+                                        sendMessage("/regOk");
+                                    } else {
+                                        sendMessage("/regNo");
+                                    }
+                                }
+                                if (str.startsWith("/auth ")) {
+                                    String[] token = str.split("\\s",3);
+                                    String newNick = server.getAuthService().getNicknameByLoginAndPassword(token[1], token[2]);
+                                    if (newNick != null) {
+                                        login = token[1];
+                                        if(!server.isLoginAuthenticated(login)){
+                                            nickname = newNick;
+                                            out.writeUTF("/authOk " + nickname);
+                                            server.subscribe(this);
+                                            socket.setSoTimeout(0);
+                                            break;
+                                        } else{
+                                            out.writeUTF("Учетная запись уже используется");
+                                        }
+                                    } else {
+                                        out.writeUTF("Неверный логин/пароль");
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    // цикл работы
-                    while (true) {
-                        String str = in.readUTF();
+                        // цикл работы
+                        while (true) {
+                            String str = in.readUTF();
 
-                        if (str.equals("/end")) {
-                            out.writeUTF("/end");
-                            break;
+                            if (str.startsWith("/")){
+
+                                if (str.equals("/end")) {
+                                    out.writeUTF("/end");
+                                    break;
+                                }
+                                //
+                                if(str.startsWith("/w")){
+                                    String[] token = str.split("\\s+", 3);
+                                    if(token.length < 3){
+                                        continue;
+                                    }
+                                    server.SimpleMsg(this, token[1], token[2]);
+                                }
+                            } else{
+                                server.broadCastMsg(this,str);
+
+                            }
+                            //
                         }
-                        //
-                        if(str.startsWith("/w ")){
-                           String[] token = str.split("\\s", 3);
-                           server.broadCastSimpleMsg(this, token[1], token[2]);
-                        } else{
-                        server.broadCastMsg(this,str);
-
-                        }
-                        //
+                    } catch(SocketTimeoutException e){
+                        out.writeUTF("/end");
                     }
+                    //
                 } catch (IOException e) {
                     e.printStackTrace();
                 } finally {
@@ -66,6 +99,8 @@ public class ClientHandler {
                     server.unsubscribe(this);
                     try {
                         socket.close();
+                    } catch (EOFException e){
+                        System.out.println("End");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -87,5 +122,9 @@ public class ClientHandler {
 
     public String getNickname() {
         return nickname;
+    }
+
+    public String getLogin() {
+        return login;
     }
 }
