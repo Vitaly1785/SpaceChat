@@ -6,6 +6,7 @@
 <?import javafx.scene.control.TextField?>
 <?import java.net.URL?>
 <?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.ListView?>
 <VBox fx:controller="client.Controller"
       xmlns:fx="http://javafx.com/fxml" alignment="center">
         <stylesheets>
@@ -15,9 +16,13 @@
         <TextField fx:id="loginField" HBox.hgrow="ALWAYS" promptText="login" onAction="#touchEnter"/>
         <PasswordField fx:id="passwordField" HBox.hgrow="ALWAYS" promptText="password" onAction="#tryToAuth"/>
         <Button text="Auth" minWidth="70" onAction="#tryToAuth"/>
+        <Button text="Reg" minWidth="70" onAction="#showRegWindow"/>
     </HBox>
+    <HBox VBox.vgrow="ALWAYS">
 
-    <TextArea fx:id="textArea" VBox.vgrow="ALWAYS" editable="false"/>
+    <TextArea fx:id="textArea" editable="false"/>
+        <ListView fx:id="clientList" visible="false" managed="false" minWidth="100" onMouseReleased="#clickClientList"/>
+    </HBox>
 
 
     <HBox fx:id="msgPanel" visible="false" managed="false">
